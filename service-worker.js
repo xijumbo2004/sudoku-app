@@ -1,0 +1,11 @@
+self.addEventListener("install", (e) => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (e) => {
+  clients.claim();
+});
+
+self.addEventListener("fetch", (e) => {
+  // 何もしない（オンライン専用）
+});

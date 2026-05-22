@@ -1,0 +1,2474 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#000000" />
+
+    <title>ナンプレ解答アプリ</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #f0ede8;
+        --surface: #ffffff;
+        --primary: #1a1a2e;
+        --accent: #e94560;
+        --accent2: #0f3460;
+        --muted: #8a8a9a;
+        --border: #d8d5cf;
+        --given-color: #1a1a2e;
+        --solved-color: #e94560;
+        --cell-size: min(9.5vw, 38px);
+      }
+
+      body {
+        background: var(--bg);
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* ── ヘッダー ── */
+      header {
+        width: 100%;
+        background: var(--primary);
+        color: #fff;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      header .logo {
+        width: 32px;
+        height: 32px;
+        background: var(--accent);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 900;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      header h1 {
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+      header .subtitle {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.55);
+        margin-top: 1px;
+      }
+
+      /* ── ローディングバナー ── */
+      #loadBanner {
+        width: 100%;
+        max-width: 480px;
+        background: var(--accent2);
+        color: #fff;
+        padding: 10px 16px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 0;
+      }
+      #loadBanner.done {
+        background: #1a6e3c;
+      }
+      #loadBanner.error {
+        background: #a02020;
+      }
+      .spinner-sm {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        animation: spin 0.7s linear infinite;
+        flex-shrink: 0;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── メインコンテナ ── */
+      main {
+        width: 100%;
+        max-width: 480px;
+        padding: 16px;
+        flex: 1;
+      }
+
+      /* ── カード ── */
+      .card {
+        background: var(--surface);
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 14px;
+        border: 1px solid var(--border);
+      }
+      .card-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+
+      /* ── アップロードエリア ── */
+      .upload-area {
+        border: 2px dashed var(--border);
+        border-radius: 10px;
+        padding: 28px 16px;
+        text-align: center;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+        position: relative;
+      }
+      .upload-area:hover {
+        border-color: var(--accent);
+        background: #fdf5f5;
+      }
+      .upload-area input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .upload-area .icon {
+        font-size: 36px;
+        margin-bottom: 8px;
+      }
+      .upload-area .label {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--primary);
+      }
+      .upload-area .sub {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      /* ── プレビュー ── */
+      #previewWrap {
+        display: none;
+        margin-bottom: 12px;
+      }
+      #previewImg {
+        width: 100%;
+        border-radius: 8px;
+        max-height: 200px;
+        object-fit: contain;
+        background: #eee;
+      }
+
+      /* ── ボタン ── */
+      .btn {
+        width: 100%;
+        padding: 13px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        transition:
+          opacity 0.15s,
+          transform 0.1s;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn-secondary {
+        background: var(--accent2);
+        color: #fff;
+        margin-top: 8px;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        margin-top: 8px;
+        font-size: 13px;
+      }
+
+      /* ── ステータスログ ── */
+      #logWrap {
+        margin-top: 10px;
+      }
+      #log {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: monospace;
+        max-height: 64px;
+        overflow-y: auto;
+        background: #f7f5f0;
+        border-radius: 6px;
+        padding: 6px 8px;
+        white-space: pre-wrap;
+        line-height: 1.5;
+      }
+
+      /* ── warp プレビュー ── */
+      #warpWrap {
+        display: none;
+        margin-bottom: 12px;
+        text-align: center;
+      }
+      #warpedCanvas {
+        width: min(180px, 40vw);
+        height: min(180px, 40vw);
+        border-radius: 6px;
+      }
+
+      .grid-wrap {
+        display: flex;
+        justify-content: center;
+        margin: 4px 0 12px;
+        width: 100%;
+      }
+
+      .sudoku-grid {
+        display: grid;
+        width: 100%; /* ★ 画面幅いっぱい */
+        max-width: 480px; /* 好みで */
+        grid-template-columns: repeat(9, 1fr); /* ★ 固定px → 1fr に */
+        border: 2.5px solid var(--primary);
+        border-radius: 3px;
+        overflow: visible; /* ★ 切り落とさない */
+      }
+
+      .sudoku-cell {
+        aspect-ratio: 1 / 1; /* ★ 正方形維持 */
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 700;
+        border: 0.5px solid #ccc;
+        background: #fff;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+
+      /* 3×3ブロック境界 */
+      .sudoku-cell[data-c="2"],
+      .sudoku-cell[data-c="5"] {
+        border-right: 2px solid var(--primary);
+      }
+      .sudoku-cell[data-r="2"],
+      .sudoku-cell[data-r="5"] {
+        border-bottom: 2px solid var(--primary);
+      }
+
+      .sudoku-cell.given {
+        color: var(--given-color);
+      }
+      .sudoku-cell.solved {
+        color: var(--solved-color);
+      }
+      .sudoku-cell.empty {
+        color: #ddd;
+      }
+      .sudoku-cell.focus {
+        background: #fff5f5;
+      }
+      .sudoku-cell.conflict {
+        background: #fff0f0;
+      }
+
+      /* ── メッセージ ── */
+      .msg {
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        margin-bottom: 10px;
+        display: none;
+      }
+      .msg-ok {
+        background: #eafaf1;
+        color: #1a6e3c;
+        border: 1px solid #a8d5b8;
+      }
+      .msg-err {
+        background: #fdecea;
+        color: #a02020;
+        border: 1px solid #f5b8b8;
+      }
+      .msg-warn {
+        background: #fef9e7;
+        color: #7d6008;
+        border: 1px solid #f9d976;
+      }
+
+      /* ── セクション表示制御 ── */
+      .section {
+        display: none;
+      }
+      .section.active {
+        display: block;
+      }
+
+      /* ── 数字ピッカー（モバイル用） ── */
+      #picker {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border-top: 1px solid var(--border);
+        padding: 12px 16px 28px;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
+        z-index: 100;
+      }
+      #picker.open {
+        display: block;
+      }
+      #picker .picker-title {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      #picker .picker-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+      }
+      #picker .pk {
+        padding: 12px 0;
+        border-radius: 8px;
+        border: none;
+        background: var(--bg);
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--primary);
+        cursor: pointer;
+        text-align: center;
+      }
+      #picker .pk:active {
+        background: #e0ddd8;
+      }
+      #picker .pk.del {
+        color: var(--accent);
+        font-size: 14px;
+      }
+      #pickerOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 99;
+        background: rgba(0, 0, 0, 0.2);
+      }
+      #pickerOverlay.open {
+        display: block;
+      }
+      #rawWrap {
+        position: relative;
+        text-align: left !important;
+      }
+      #rawCanvas {
+        display: block;
+        height: auto;
+        max-width: 100%;
+        border-radius: 6px;
+        background: #eee;
+        image-rendering: pixelated; /* ★追加 */
+      }
+      #warpCanvas {
+        display: block;
+        height: auto;
+        max-width: 100%;
+        border-radius: 6px;
+        background: #eee;
+        image-rendering: pixelated; /* ★これが最重要 */
+      }
+
+      #cornerHandles {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .corner-handle {
+        width: 22px;
+        height: 22px;
+        background: #e94560;
+        border-radius: 50%;
+        position: absolute;
+        transform: translate(-50%, -50%);
+        border: 2px solid white;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+        touch-action: none;
+        pointer-events: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">N</div>
+      <div>
+        <h1>ナンプレ Solver</h1>
+        <div class="subtitle">撮影 → 認識 → 解答 — すべてブラウザ内で完結</div>
+      </div>
+    </header>
+
+    <!-- 読み込みバナー -->
+    <div id="loadBanner">
+      <div class="spinner-sm" id="loadSpinner"></div>
+      <span id="loadMsg"
+        >OpenCV.js + Pyodide を読み込み中… (初回のみ時間がかかります)</span
+      >
+    </div>
+
+    <main>
+      <!-- ① 撮影セクション -->
+      <div class="section active" id="secCapture">
+        <div class="card">
+          <div class="card-title">① 写真を選択</div>
+          <div class="upload-area">
+            <input
+              type="file"
+              id="fileInput"
+              accept="image/*"
+              capture="environment"
+            />
+            <div class="icon">📷</div>
+            <div class="label">タップして撮影 / ファイル選択</div>
+            <div class="sub">
+              ナンプレの盤面全体が映るように撮影してください
+            </div>
+          </div>
+          <div id="previewWrap"><img id="previewImg" alt="プレビュー" /></div>
+          <button
+            class="btn btn-primary"
+            id="detectBtn"
+            disabled
+            style="margin-top: 12px"
+          >
+            盤面を検出する
+          </button>
+          <div id="logWrap"><div id="log"></div></div>
+        </div>
+      </div>
+
+      <!-- ② 検出結果・確認セクション -->
+      <div class="section" id="secConfirm">
+        <div class="card">
+          <div class="card-title">② 盤面を確認・修正</div>
+          <div
+            id="rawWrap"
+            style="
+              display: none;
+              text-align: center;
+              margin-bottom: 12px;
+              position: relative;
+            "
+          >
+            <canvas id="rawCanvas"></canvas>
+
+            <!-- ★ 四角形の線を描く SVG -->
+            <svg
+              id="quadOverlay"
+              style="
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+              "
+            >
+              <polyline
+                id="quadPath"
+                points=""
+                stroke="#e94560"
+                stroke-width="2"
+                fill="none"
+              />
+            </svg>
+            <!-- ★ 四隅ハンドルは rawWrap の中に入れる -->
+            <div
+              id="cornerHandles"
+              style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+              "
+            >
+              <div class="corner-handle" id="h0"></div>
+              <div class="corner-handle" id="h1"></div>
+              <div class="corner-handle" id="h2"></div>
+              <div class="corner-handle" id="h3"></div>
+            </div>
+          </div>
+          <div id="warpWrap" style="display: none">
+            <canvas id="warpedCanvas" width="270" height="270"></canvas>
+          </div>
+          <div class="msg msg-warn" id="warnMsg"></div>
+          <div class="msg msg-err" id="detectErrMsg"></div>
+          <p style="font-size: 12px; color: var(--muted); margin-bottom: 8px">
+            四隅をドラッグで合わせてから「文字認識」→ 必要なら数字修正
+            →「解答する」
+          </p>
+
+          <div
+            id="gridEditHint"
+            style="
+              display: none;
+              font-size: 12px;
+              color: var(--muted);
+              margin-bottom: 8px;
+            "
+          >
+            マスをタップして数字を修正できます（0=空白）
+          </div>
+
+          <div class="grid-wrap">
+            <div class="sudoku-grid" id="inputGrid"></div>
+          </div>
+
+          <button class="btn btn-primary" id="recognizeBtn">
+            四隅を確定して文字認識
+          </button>
+          <button class="btn btn-secondary" id="solveBtn" disabled>
+            解答する
+          </button>
+          <button class="btn btn-ghost" id="retryBtn">撮り直す</button>
+        </div>
+      </div>
+
+      <!-- ③ 解答結果セクション -->
+      <div class="section" id="secResult">
+        <div class="card">
+          <div class="card-title">③ 解答結果</div>
+          <div class="msg msg-ok" id="solveOkMsg"></div>
+          <div class="msg msg-warn" id="solveWarnMsg"></div>
+          <div class="msg msg-err" id="solveErrMsg"></div>
+          <div class="grid-wrap">
+            <div class="sudoku-grid" id="resultGrid"></div>
+          </div>
+          <button
+            class="btn btn-ghost"
+            id="restartBtn"
+            style="margin-top: 12px"
+          >
+            最初からやり直す
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- 数字ピッカー（モバイル用ポップアップ） -->
+    <div id="pickerOverlay"></div>
+    <div id="picker">
+      <div class="picker-title" id="pickerTitle">数字を選択</div>
+      <div class="picker-grid" id="pickerGrid"></div>
+    </div>
+
+    <!-- ライブラリ読み込み -->
+    <script
+      async
+      src="https://docs.opencv.org/4.x/opencv.js"
+      onload="onCvReady()"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <script>
+      // ═══════════════════════════════════════════════════
+      //  状態管理
+      // ═══════════════════════════════════════════════════
+      let cvReady = false,
+        pyReady = false;
+      let originalImg = null;
+      let detectedBoard = Array.from({ length: 9 }, () => Array(9).fill(0));
+      let givenMask = Array.from({ length: 9 }, () => Array(9).fill(false));
+      let uncertainMask = Array.from({ length: 9 }, () => Array(9).fill(false));
+      let pyodide = null;
+      let pickerTarget = null;
+      let gSrc = null;
+      let ocrWorker = null;
+      let boardRecognized = false;
+
+      // ═══════════════════════════════════════════════════
+      //  ライブラリ初期化
+      // ═══════════════════════════════════════════════════
+      function onCvReady() {
+        cvReady = true;
+        checkReady();
+      }
+
+      async function initPyodide() {
+        try {
+          setLoad("Pyodide を初期化中…");
+          pyodide = await loadPyodide({
+            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/",
+          });
+          setLoad("solver.py を読み込み中…");
+          await pyodide.runPythonAsync(SOLVER_CODE);
+          pyReady = true;
+          checkReady();
+        } catch (e) {
+          setBanner("error", "Pyodide の読み込みに失敗しました: " + e.message);
+          console.error(e);
+        }
+      }
+
+      function checkReady() {
+        if (cvReady && pyReady) {
+          setBanner("done", "✅ 準備完了 — 写真を選択してください");
+          document.getElementById("loadSpinner").style.display = "none";
+          if (document.getElementById("fileInput")._pendingFile) {
+            loadPreview(document.getElementById("fileInput")._pendingFile);
+          }
+        }
+      }
+
+      function setLoad(msg) {
+        document.getElementById("loadMsg").textContent = msg;
+      }
+      function setBanner(state, msg) {
+        const el = document.getElementById("loadBanner");
+        el.className = state;
+        document.getElementById("loadMsg").textContent = msg;
+      }
+
+      initPyodide();
+
+      // ═══════════════════════════════════════════════════
+      //  solver.py の内容（文字列として埋め込み）
+      // ═══════════════════════════════════════════════════
+      const SOLVER_CODE = `
+class CandidateList(list):
+    def __init__(self, values):
+        # 1〜9 のみ許可
+        if any(v < 1 or v > 9 for v in values):
+            raise ValueError("候補は 1〜9 の数字のみです")
+
+        # 重複禁止
+        if len(values) != len(set(values)):
+            raise ValueError("候補に重複があります")
+
+        super().__init__(values)
+
+    # 追加系メソッドはすべて禁止
+    def append(self, value):
+        raise RuntimeError("候補リストに数字を追加することは禁止されています")
+
+    def extend(self, values):
+        raise RuntimeError("候補リストに数字を追加することは禁止されています")
+
+    def insert(self, index, value):
+        raise RuntimeError("候補リストに数字を追加することは禁止されています")
+
+    # 削除は許可（list の remove/pop はそのまま使える）
+    
+class NumberPlace:
+    def __init__(self):
+        self.board = [[None for _ in range(9)] for _ in range(9)]
+    
+    def print_board(self):
+        print("-" * 25)
+        for y in range(9):
+            row = ""
+            for x in range(9):
+                val = self.board[y][x]
+                row += f"{val or '.'} "
+                if x % 3 == 2:
+                    row += "| "
+            print(row)
+            if y % 3 == 2:
+                print("-" * 25)
+                
+    def set_number(self, x: int, y: int, num: int):
+      x -= 1
+      y -= 1
+
+      # 行チェック
+      for cx in range(9):
+          if self.board[y][cx] == num:
+              raise ValueError(f"行 {y+1} に {num} が重複しています")
+
+      # 列チェック
+      for ry in range(9):
+          if self.board[ry][x] == num:
+              raise ValueError(f"列 {x+1} に {num} が重複しています")
+
+      # 3x3 チェック
+      br = (y // 3) * 3
+      bc = (x // 3) * 3
+      for ry in range(br, br + 3):
+          for cx in range(bc, bc + 3):
+              if self.board[ry][cx] == num:
+                  raise ValueError(f"ブロック内に {num} が重複しています")
+
+      # 問題なければセット
+      self.board[y][x] = num
+
+    def get_number(self, x: int, y:int):
+        x -= 1
+        y -= 1
+        return self.board[y][x]
+
+    def is_complete(self):
+        return all(
+            all(cell is not None for cell in row) 
+            for row in self.board)
+        
+class OpportunityBoard:
+    def __init__(self, debug_mode=False):
+        self.debug_mode = debug_mode
+        self.board = [
+            [CandidateList([1,2,3,4,5,6,7,8,9]) for _ in range(9)]
+            for _ in range(9)
+        ]
+
+    def debug(self, *args):
+        if self.debug_mode:
+            print(*args)
+
+    # --- 座標変換（1-based → 0-based） ---
+    def _to_internal(self, x, y):
+        return x - 1, y - 1
+
+    # --- 座標ユーティリティ ---
+    def row_cells(self, y):
+        return tuple((x, y) for x in range(9))
+
+    def col_cells(self, x):
+        return tuple((x, y) for y in range(9))
+
+    def block_cells(self, x, y):
+        bx, by = (x // 3) * 3, (y // 3) * 3
+        return tuple((bx + dx, by + dy) for dy in range(3) for dx in range(3))
+
+    # --- 候補削除（旧 eliminate_from_cells） ---
+    def eliminate_from_cells(self, cells, num):
+        for x, y in cells:
+            cell = self.board[y][x]
+            if len(cell) > 1 and num in cell:
+                cell.remove(num)
+
+    # --- 単マス削除・検索 ---
+    def delete_number(self, x, y, num):
+        x, y = self._to_internal(x, y)
+        cell = self.board[y][x]
+        if num in cell:
+            cell.remove(num)
+
+    def search_number(self, x, y, num):
+        x, y = self._to_internal(x, y)
+        return num in self.board[y][x]
+
+    # --- デバッグ用表示 ---
+    def print_board(self):
+        print("-" * 37)
+        for y in range(9):
+            row = ""
+            for x in range(9):
+                cell = self.board[y][x]
+                if len(cell) == 1:
+                    s = f" {cell[0]} "
+                else:
+                    s = "{" + "".join(str(n) for n in cell) + "}"
+                    s = s.ljust(5)
+                row += s + " "
+                if x % 3 == 2:
+                    row += "| "
+            print(row)
+            if y % 3 == 2:
+                print("-" * 37)
+
+    # --- 候補確定 ---
+    def set_number(self, x, y, num):
+        x, y = self._to_internal(x, y)
+        self.board[y][x] = CandidateList([num])
+
+    def set_list(self, x, y, i_list):
+        x, y = self._to_internal(x, y)
+        self.board[y][x] = i_list
+
+    # --- NumberPlace → OpportunityBoard ---
+    def update_board(self, n_p):
+        for y in range(9):
+            for x in range(9):
+                num = n_p.board[y][x]
+                if num is not None:
+                    self.board[y][x] = CandidateList([num])
+
+    # --- OpportunityBoard → NumberPlace ---
+    def check_update_board(self, n_p):
+        for y in range(9):
+            for x in range(9):
+                cell = self.board[y][x]
+                if len(cell) == 1 and n_p.board[y][x] is None:
+                    n_p.board[y][x] = cell[0]
+
+class Solver:
+    def __init__(self, board: NumberPlace, opp: OpportunityBoard):
+        self.board = board
+        self.opp = opp
+        self.strategy = Strategy(opp, board)
+
+        # 戦略をリスト化（後で追加しやすい）
+        self.strategies = [
+            self.strategy.strategy_one,
+            self.strategy.strategy_unique,
+            self.strategy.strategy_naked_pair,
+            self.strategy.strategy_naked_triple,
+            self.strategy.strategy_pointing_pair,
+            self.strategy.strategy_box_line_reduction,
+            self.strategy.strategy_hidden_pair,
+            self.strategy.strategy_x_wing,
+            self.strategy.strategy_xyz_wing,
+            self.strategy.strategy_xy_wing,
+        ]
+
+    def solve(self):
+        self.opp.update_board(self.board)
+
+        def current_int_board():
+            return [[self.board.board[r][c] or 0 for c in range(9)] for r in range(9)]
+
+        while True:
+            changed = False
+
+            for strat in self.strategies:
+                before = snapshot_board(self.opp.board)
+                strat()
+                self.opp.check_update_board(self.board)
+
+                current = current_int_board()
+                if not is_valid_board(current):
+                    raise ValueError(f"手筋ロジックで矛盾が発生しました ({strat.__name__})")
+
+                if before != snapshot_board(self.opp.board):
+                    changed = True
+                    break
+
+            if not changed:
+                break
+
+
+class Strategy:
+    def __init__(self, opp: OpportunityBoard, board: NumberPlace):
+        self.opp = opp
+        self.board = board
+
+    def strategy_one(self):
+        for y in range(9):
+            for x in range(9):
+                num = self.board.board[y][x]
+                if num is None:
+                    continue
+                for cells in (self.opp.row_cells(y),
+                              self.opp.col_cells(x),
+                              self.opp.block_cells(x, y)):
+                    self.opp.eliminate_from_cells(cells, num)
+
+    def find_unique_candidate(self, cells):
+        # 候補 → 出現マス一覧 の辞書を作る
+        candidate_map = {n: [] for n in range(1, 10)}
+
+        for x, y in cells:
+            cell = self.opp.board[y][x]
+            if len(cell) == 1:
+                continue  # 確定マスは対象外
+
+            for num in cell:
+                candidate_map[num].append((x, y))
+
+        # 出現回数が1の候補があれば、それが唯一候補
+        for num, positions in candidate_map.items():
+            if len(positions) == 1:
+                x, y = positions[0]
+                return (x, y, num)
+
+        return None
+
+
+    def apply_unique(self, x, y, num):
+        # OpportunityBoard に確定を反映（内部座標に変換）
+        self.opp.board[y][x] = CandidateList([num])
+
+        # NumberPlace にも反映（内部座標）
+        self.board.board[y][x] = num
+
+    def strategy_unique(self):
+        units = (
+            [self.opp.row_cells(y) for y in range(9)] +
+            [self.opp.col_cells(x) for x in range(9)] +
+            [self.opp.block_cells(bx, by)
+            for by in range(0, 9, 3)
+            for bx in range(0, 9, 3)]
+        )
+        for cells in units:
+            res = self.find_unique_candidate(cells)
+            if res:
+                self.apply_unique(*res)
+                return
+                    
+    def strategy_naked_pair(self):
+        from itertools import combinations
+        units = (
+            [self.opp.row_cells(y) for y in range(9)] +
+            [self.opp.col_cells(x) for x in range(9)] +
+            [self.opp.block_cells(bx, by)
+            for by in range(0, 9, 3)
+            for bx in range(0, 9, 3)]
+        )
+        for cells in units:
+            pairs = [(x, y, tuple(self.opp.board[y][x]))
+                    for x, y in cells if len(self.opp.board[y][x]) == 2]
+            for (x1, y1, p1), (x2, y2, p2) in combinations(pairs, 2):
+                if p1 == p2:
+                    for x, y in cells:
+                        if (x, y) not in [(x1, y1), (x2, y2)]:
+                            for n in p1:
+                                self.opp.delete_number(x+1, y+1, n)
+                                
+    def strategy_naked_triple(self):
+        from itertools import combinations
+
+        units = (
+            [self.opp.row_cells(y) for y in range(9)] +
+            [self.opp.col_cells(x) for x in range(9)] +
+            [self.opp.block_cells(bx, by)
+            for by in range(0, 9, 3)
+            for bx in range(0, 9, 3)]
+        )
+
+        for cells in units:
+            triples = [(x, y, tuple(sorted(self.opp.board[y][x])))
+                      for x, y in cells if 2 <= len(self.opp.board[y][x]) <= 3]
+
+            for (x1, y1, c1), (x2, y2, c2), (x3, y3, c3) in combinations(triples, 3):
+                union = set(c1) | set(c2) | set(c3)
+                if len(union) != 3:
+                    continue
+
+                for x, y in cells:
+                    if (x, y) not in [(x1, y1), (x2, y2), (x3, y3)]:
+                        for n in union:
+                            self.opp.delete_number(x+1, y+1, n)
+    
+    def strategy_pointing_pair(self):
+        for by in range(0, 9, 3):
+            for bx in range(0, 9, 3):
+                cells = self.opp.block_cells(bx, by)
+
+                for num in range(1, 10):
+                    pos = [(x, y) for x, y in cells if num in self.opp.board[y][x]]
+                    if len(pos) <= 1:
+                        continue
+
+                    rows = {y for _, y in pos}
+                    if len(rows) == 1:
+                        ry = rows.pop()
+                        for x in range(9):
+                            if not (bx <= x < bx + 3):
+                                self.opp.delete_number(x+1, ry+1, num)
+
+                    cols = {x for x, _ in pos}
+                    if len(cols) == 1:
+                        cx = cols.pop()
+                        for y in range(9):
+                            if not (by <= y < by + 3):
+                                self.opp.delete_number(cx+1, y+1, num)
+                                    
+    def strategy_box_line_reduction(self):
+        for y in range(9):
+            cells = self.opp.row_cells(y)
+            for num in range(1, 10):
+                pos = [(x, y) for x, y in cells if num in self.opp.board[y][x]]
+                if len(pos) > 1:
+                    blocks = {(x // 3, y // 3) for x, y in pos}
+                    if len(blocks) == 1:
+                        bx, by = blocks.pop()
+                        for yy in range(by * 3, by * 3 + 3):
+                            if yy != y:
+                                for xx in range(bx * 3, bx * 3 + 3):
+                                    self.opp.delete_number(xx+1, yy+1, num)
+
+        for x in range(9):
+            cells = self.opp.col_cells(x)
+            for num in range(1, 10):
+                pos = [(x, y) for x, y in cells if num in self.opp.board[y][x]]
+                if len(pos) > 1:
+                    blocks = {(x // 3, y // 3) for x, y in pos}
+                    if len(blocks) == 1:
+                        bx, by = blocks.pop()
+                        for xx in range(bx * 3, bx * 3 + 3):
+                            if xx != x:
+                                for yy in range(by * 3, by * 3 + 3):
+                                    self.opp.delete_number(xx+1, yy+1, num)
+
+    def strategy_hidden_pair(self):
+        from itertools import combinations
+
+        units = (
+            [self.opp.row_cells(y) for y in range(9)] +
+            [self.opp.col_cells(x) for x in range(9)] +
+            [self.opp.block_cells(bx, by)
+            for by in range(0, 9, 3)
+            for bx in range(0, 9, 3)]
+        )
+
+        for cells in units:
+            num_pos = {n: [] for n in range(1, 10)}
+            for x, y in cells:
+                for n in self.opp.board[y][x]:
+                    num_pos[n].append((x, y))
+
+            pairs = [n for n, pos in num_pos.items() if len(pos) == 2]
+
+            for a, b in combinations(pairs, 2):
+                if set(num_pos[a]) == set(num_pos[b]):
+                    for x, y in num_pos[a]:
+                        self.opp.board[y][x] = CandidateList([a, b])
+
+    def strategy_hidden_triple(self):
+        from itertools import combinations
+
+        units = (
+            [self.opp.row_cells(y) for y in range(9)] +
+            [self.opp.col_cells(x) for x in range(9)] +
+            [self.opp.block_cells(bx, by)
+            for by in range(0, 9, 3)
+            for bx in range(0, 9, 3)]
+        )
+
+        for cells in units:
+            num_pos = {n: [] for n in range(1, 10)}
+            for x, y in cells:
+                for n in self.opp.board[y][x]:
+                    num_pos[n].append((x, y))
+
+            nums = [n for n, pos in num_pos.items() if 2 <= len(pos) <= 3]
+
+            for a, b, c in combinations(nums, 3):
+                union = set(num_pos[a]) | set(num_pos[b]) | set(num_pos[c])
+                if len(union) == 3:
+                    triple = {a, b, c}
+                    for x, y in union:
+                        self.opp.board[y][x] = CandidateList(sorted(triple))
+
+    def strategy_xyz_wing(self):
+        from itertools import combinations
+
+        for py in range(9):
+            for px in range(9):
+                pivot = self.opp.board[py][px]
+                if len(pivot) != 3:
+                    continue
+                pset = set(pivot)
+
+                units = (
+                    self.opp.row_cells(py),
+                    self.opp.col_cells(px),
+                    self.opp.block_cells(px - px % 3, py - py % 3)
+                )
+
+                wings = [(x, y, set(self.opp.board[y][x]))
+                        for cells in units
+                        for x, y in cells
+                        if (x, y) != (px, py)
+                        and len(self.opp.board[y][x]) == 2
+                        and set(self.opp.board[y][x]).issubset(pset)]
+
+                for (x1, y1, w1), (x2, y2, w2) in combinations(wings, 2):
+                    if w1 | w2 != pset:
+                        continue
+                    common = w1 & w2
+                    if len(common) != 1:
+                        continue
+                    target = next(iter(common))
+
+                    piv = (px, py)
+                    wA = (x1, y1)
+                    wB = (x2, y2)
+
+                    def same_unit(a, b):
+                        ax, ay = a
+                        bx, by = b
+                        return (
+                            ax == bx or
+                            ay == by or
+                            (ax // 3 == bx // 3 and ay // 3 == by // 3)
+                        )
+
+                    for y in range(9):
+                        for x in range(9):
+                            if (x, y) in (piv, wA, wB):
+                                continue
+                            if (same_unit((x, y), piv) and
+                                same_unit((x, y), wA) and
+                                same_unit((x, y), wB)):
+                                self.opp.delete_number(x+1, y+1, target)
+
+
+    def strategy_x_wing(self):
+        from itertools import combinations
+
+        # --- 行ベース ---
+        for num in range(1, 10):
+            rows = {y: [x for x in range(9) if num in self.opp.board[y][x]]
+                    for y in range(9)}
+            rows = {y: cols for y, cols in rows.items() if len(cols) == 2}
+
+            for r1, r2 in combinations(rows.keys(), 2):
+                if rows[r1] == rows[r2]:
+                    c1, c2 = rows[r1]
+                    for y in range(9):
+                        if y not in (r1, r2):
+                            self.opp.delete_number(c1+1, y+1, num)
+                            self.opp.delete_number(c2+1, y+1, num)
+
+        # --- 列ベース ---
+        for num in range(1, 10):
+            cols = {x: [y for y in range(9) if num in self.opp.board[y][x]]
+                    for x in range(9)}
+            cols = {x: rows for x, rows in cols.items() if len(rows) == 2}
+
+            for c1, c2 in combinations(cols.keys(), 2):
+                if cols[c1] == cols[c2]:
+                    r1, r2 = cols[c1]
+                    for x in range(9):
+                        if x not in (c1, c2):
+                            self.opp.delete_number(x+1, r1+1, num)
+                            self.opp.delete_number(x+1, r2+1, num)
+
+    def strategy_xy_wing(self):
+        from itertools import combinations
+
+        for py in range(9):
+            for px in range(9):
+                pivot = self.opp.board[py][px]
+                if len(pivot) != 2:
+                    continue
+                pset = set(pivot)
+
+                units = (
+                    self.opp.row_cells(py),
+                    self.opp.col_cells(px),
+                    self.opp.block_cells(px - px % 3, py - py % 3)
+                )
+
+                wings = [(x, y, set(self.opp.board[y][x]))
+                        for cells in units
+                        for x, y in cells
+                        if (x, y) != (px, py)
+                        and len(self.opp.board[y][x]) == 2
+                        and len(pset & set(self.opp.board[y][x])) == 1]
+
+                for (x1, y1, w1), (x2, y2, w2) in combinations(wings, 2):
+                    diff = (w1 | w2) - pset
+                    if len(diff) != 1:
+                        continue
+                    z = next(iter(diff))
+
+                    def same_unit(a, b):
+                        ax, ay = a
+                        bx, by = b
+                        return (
+                            ax == bx or
+                            ay == by or
+                            (ax // 3 == bx // 3 and ay // 3 == by // 3)
+                        )
+
+                    for y in range(9):
+                        for x in range(9):
+                            if (x, y) in [(x1, y1), (x2, y2), (px, py)]:
+                                continue
+                            if same_unit((x, y), (x1, y1)) and same_unit((x, y), (x2, y2)):
+                                self.opp.delete_number(x+1, y+1, z)
+
+def snapshot_board(board):
+    return tuple(tuple(tuple(c) if isinstance(c, list) else c for c in row)
+                 for row in board)
+
+def is_valid(board, r, c, v):
+    if any(board[r][x] == v for x in range(9) if x != c):
+        return False
+    if any(board[y][c] == v for y in range(9) if y != r):
+        return False
+    br, bc = (r // 3) * 3, (c // 3) * 3
+    if any(board[y][x] == v for y in range(br, br+3)
+                           for x in range(bc, bc+3)
+                           if (y, x) != (r, c)):
+        return False
+    return True
+
+def find_empty(board):
+    for r in range(9):
+        for c in range(9):
+            if board[r][c] == 0:
+                return r, c
+    return None
+
+def solve_backtrack(board):
+    pos = find_empty(board)
+    if not pos:
+        return True
+    r, c = pos
+    for v in range(1, 10):
+        if is_valid(board, r, c, v):
+            board[r][c] = v
+            if solve_backtrack(board):
+                return True
+            board[r][c] = 0
+    return False
+
+def is_valid_board(board):
+    for r in range(9):
+        row = [n for n in board[r] if n != 0]
+        if len(row) != len(set(row)):
+            return False
+
+    for c in range(9):
+        col = [board[r][c] for r in range(9) if board[r][c] != 0]
+        if len(col) != len(set(col)):
+            return False
+
+    for br in range(0, 9, 3):
+        for bc in range(0, 9, 3):
+            box = [board[r][c]
+                   for r in range(br, br+3)
+                   for c in range(bc, bc+3)
+                   if board[r][c] != 0]
+            if len(box) != len(set(box)):
+                return False
+
+    return True
+
+def solve_board(raw_board):
+    logs = []
+    log = lambda x: logs.append(str(x))
+
+    log(f"raw_board BEFORE: {raw_board}")
+    log(f"type(raw_board): {type(raw_board)}")
+
+    try:
+        raw_board = [list(row) for row in raw_board]
+        log(f"raw_board AFTER: {raw_board}")
+    except Exception as e:
+        return {
+            "status": "invalid",
+            "message": f"盤面データの変換に失敗しました: {e}",
+            "logs": logs,
+            "board": []
+        }
+
+    if not is_valid_board(raw_board):
+        log("invalid board detected")
+        return {
+            "status": "invalid",
+            "message": "盤面に矛盾があります（同じ数字が重複しています）",
+            "logs": logs,
+            "board": raw_board
+        }
+
+    n_p = NumberPlace()
+    o_b = OpportunityBoard()
+
+    for r in range(9):
+        for c in range(9):
+            num = raw_board[r][c]
+            if 1 <= num <= 9:
+                n_p.set_number(c+1, r+1, num)
+
+    solver = Solver(n_p, o_b)
+    try:
+        solver.solve()
+    except ValueError as e:
+        return {
+            "status": "invalid",
+            "message": str(e),
+            "board": [[n_p.board[r][c] or 0 for c in range(9)] for r in range(9)]
+        }
+
+    board = [[n_p.board[r][c] or 0 for c in range(9)] for r in range(9)]
+
+    if not n_p.is_complete():
+        ok = solve_backtrack(board)
+        status = "solved" if ok else "unsolved"
+    else:
+        status = "solved"
+
+    if status == "solved" and not is_valid_board(board):
+        return {
+            "status": "invalid",
+            "message": "解答盤面に矛盾があります（同じ数字が重複しています）",
+            "board": board
+        }
+
+    return {"status": status, "board": board}
+                  `;
+
+      // ═══════════════════════════════════════════════════
+      //  ファイル選択・プレビュー
+      // ═══════════════════════════════════════════════════
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (!(cvReady && pyReady)) {
+            this._pendingFile = file;
+            return;
+          }
+          loadPreview(file);
+        });
+
+      function loadPreview(file) {
+        const img = new Image();
+        img.onload = () => {
+          originalImg = img;
+          const pw = document.getElementById("previewWrap");
+          document.getElementById("previewImg").src = img.src;
+          pw.style.display = "block";
+          document.getElementById("detectBtn").disabled = false;
+        };
+        img.src = URL.createObjectURL(file);
+      }
+
+      // ═══════════════════════════════════════════════════
+      //  盤面検出
+      // ═══════════════════════════════════════════════════
+      const log = document.getElementById("log");
+      function addLog(msg) {
+        log.textContent += msg + "\n";
+        log.scrollTop = log.scrollHeight;
+      }
+
+      document.getElementById("detectBtn").addEventListener("click", () => {
+        if (!(cvReady && pyReady) || !originalImg) return;
+        log.textContent = "";
+        runDetection();
+      });
+      function updateQuadOverlay() {
+        const handles = [
+          document.getElementById("h0"),
+          document.getElementById("h1"),
+          document.getElementById("h2"),
+          document.getElementById("h3"),
+        ];
+        const overlay = document.getElementById("quadOverlay");
+        const path = document.getElementById("quadPath");
+        if (!overlay || !path) return;
+
+        const rect = overlay.getBoundingClientRect();
+
+        // left/top は "0%"〜"100%" なので数値に変換
+        const pts = handles.map((h) => {
+          const lx = parseFloat(h.style.left); // 0〜100
+          const ty = parseFloat(h.style.top); // 0〜100
+          return {
+            x: (lx / 100) * rect.width,
+            y: (ty / 100) * rect.height,
+          };
+        });
+
+        // h0 → h1 → h2 → h3 → h0 の順で結ぶ
+        const d = [
+          `${pts[0].x},${pts[0].y}`,
+          `${pts[1].x},${pts[1].y}`,
+          `${pts[2].x},${pts[2].y}`,
+          `${pts[3].x},${pts[3].y}`,
+          `${pts[0].x},${pts[0].y}`,
+        ].join(" ");
+
+        path.setAttribute("points", d);
+      }
+
+      /*let gSrc = null; // warp / OCR 用に保持する元画像*/
+
+      async function ensureOcrWorker() {
+        if (ocrWorker) return ocrWorker;
+
+        addLog("OCRエンジンを初期化中…");
+        ocrWorker = await Tesseract.createWorker("eng");
+
+        await ocrWorker.setParameters({
+          tessedit_char_whitelist: "123456789",
+          tessedit_pageseg_mode: Tesseract.PSM.SINGLE_CHAR,
+        });
+
+        return ocrWorker;
+      }
+
+      function setHandlesFromCorners(corners, imgW, imgH) {
+        const handles = [
+          document.getElementById("h0"),
+          document.getElementById("h1"),
+          document.getElementById("h2"),
+          document.getElementById("h3"),
+        ];
+
+        corners.forEach((p, i) => {
+          handles[i].style.left = `${(p.x / imgW) * 100}%`;
+          handles[i].style.top = `${(p.y / imgH) * 100}%`;
+        });
+
+        document.getElementById("cornerHandles").style.display = "block";
+        updateQuadOverlay();
+      }
+
+      function waitUntilLayoutReady(el) {
+        return new Promise((resolve) => {
+          function check() {
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              resolve();
+            } else {
+              requestAnimationFrame(check);
+            }
+          }
+          check();
+        });
+      }
+
+      function waitCanvasPainted(canvas) {
+        return new Promise((resolve) => {
+          function check() {
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              resolve();
+            } else {
+              requestAnimationFrame(check);
+            }
+          }
+          check();
+        });
+      }
+
+      function drawDebugPointOnRawCanvas(pt, color = "magenta") {
+        const rawCanvas = document.getElementById("rawCanvas");
+        const ctx = rawCanvas.getContext("2d");
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function debugDrawCornersOnRawCanvas(refinedCorners) {
+        const canvas = document.getElementById("rawCanvas");
+        const ctx = canvas.getContext("2d");
+
+        ctx.save();
+        ctx.strokeStyle = "lime";
+        ctx.fillStyle = "red";
+        ctx.lineWidth = 2;
+
+        // 4点を線で結ぶ
+        ctx.beginPath();
+        ctx.moveTo(refinedCorners[0].x, refinedCorners[0].y);
+        for (let i = 1; i < 4; i++) {
+          ctx.lineTo(refinedCorners[i].x, refinedCorners[i].y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        // 各点に丸を描く
+        refinedCorners.forEach((p, i) => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillText(String(i), p.x + 8, p.y - 8);
+        });
+
+        ctx.restore();
+      }
+
+      function debugDrawLines(src, x0, y0, lines) {
+        const canvas = document.getElementById("rawCanvas");
+        const ctx = canvas.getContext("2d");
+
+        ctx.save();
+        ctx.strokeStyle = "cyan";
+        ctx.lineWidth = 3;
+
+        // 1. すべての線を JS 配列に取り出す
+        let arr = [];
+        for (let i = 0; i < lines.rows; i++) {
+          let [x1, y1, x2, y2] = lines.data32S.slice(i * 4, i * 4 + 4);
+          let len = Math.hypot(x2 - x1, y2 - y1);
+          arr.push({ x1, y1, x2, y2, len });
+        }
+
+        // 2. 長さ順にソート（長い線が先）
+        arr.sort((a, b) => b.len - a.len);
+
+        // 3. 上位 3 本だけ描画（外枠の線が入るはず）
+        const N = Math.min(3, arr.length);
+        for (let i = 0; i < N; i++) {
+          let L = arr[i];
+
+          // ROI → 元画像座標へ変換
+          let x1 = L.x1 + x0;
+          let y1 = L.y1 + y0;
+          let x2 = L.x2 + x0;
+          let y2 = L.y2 + y0;
+
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
+      // userPoint: {x: number, y: number}
+      // src: cv.Mat (元画像)
+      // return: cv.Point2f（補正された角）
+      function refineCorner(src, userPoint, cornerIndex) {
+        const R = 60; // ユーザ点の周囲 ±60px を見る
+
+        const x0 = Math.max(0, userPoint.x - R);
+        const y0 = Math.max(0, userPoint.y - R);
+        const w = Math.min(R * 2, src.cols - x0);
+        const h = Math.min(R * 2, src.rows - y0);
+
+        if (w <= 5 || h <= 5) {
+          return new cv.Point(userPoint.x, userPoint.y);
+        }
+
+        const roi = src.roi(new cv.Rect(x0, y0, w, h));
+
+        let gray = new cv.Mat();
+        cv.cvtColor(roi, gray, cv.COLOR_RGBA2GRAY);
+
+        let edges = new cv.Mat();
+        cv.Canny(gray, edges, 50, 150);
+
+        let lines = new cv.Mat();
+        cv.HoughLinesP(edges, lines, 1, Math.PI / 180, 30, 30, 10);
+        //debugDrawLines(src, x0, y0, lines);
+
+        let corners = new cv.Mat();
+        cv.goodFeaturesToTrack(gray, corners, 50, 0.01, 10);
+
+        if (corners.rows === 0) {
+          gray.delete();
+          roi.delete();
+          corners.delete();
+          edges.delete();
+          lines.delete();
+          return new cv.Point(userPoint.x, userPoint.y);
+        }
+
+        // ★ ユーザ点に最も近い角を採用（方向フィルタなし）
+        let best = null;
+        let bestDist = 1e18;
+
+        for (let i = 0; i < corners.rows; i++) {
+          let cx = corners.data32F[i * 2] + x0;
+          let cy = corners.data32F[i * 2 + 1] + y0;
+
+          let dx2 = cx - userPoint.x;
+          let dy2 = cy - userPoint.y;
+          let dist2 = dx2 * dx2 + dy2 * dy2;
+
+          if (dist2 < bestDist) {
+            bestDist = dist2;
+            best = new cv.Point(cx, cy);
+          }
+        }
+
+        gray.delete();
+        roi.delete();
+        corners.delete();
+        edges.delete();
+        lines.delete();
+
+        return best;
+      }
+
+      function refineAllCorners(src, userCorners) {
+        return userCorners.map((pt, i) => refineCorner(src, pt, i));
+      }
+
+      async function runDetection() {
+        try {
+          /* 
+          const tmpC = document.createElement("canvas");
+          const maxSide = 900;
+          const scale = Math.min(
+            1,
+            maxSide / Math.max(originalImg.width, originalImg.height),
+          );
+
+          tmpC.width = Math.round(originalImg.width * scale);
+          tmpC.height = Math.round(originalImg.height * scale);
+          const tmpCtx = tmpC.getContext("2d");
+          tmpCtx.imageSmoothingEnabled = true;
+
+          // ★ ぼかしフィルタをかけた状態で縮小描画
+          tmpCtx.drawImage(originalImg, 0, 0, tmpC.width, tmpC.height);
+
+          // ★ originalImg → フルサイズ canvas に描画
+          // ★ ここから先は今まで通り
+          */
+          // ★ originalImg → フルサイズ canvas に描画
+          const fullC = document.createElement("canvas");
+          fullC.width = originalImg.width;
+          fullC.height = originalImg.height;
+
+          const fullCtx = fullC.getContext("2d");
+          fullCtx.drawImage(originalImg, 0, 0);
+
+          // ★ OpenCV に読み込む（縮小前の画像）
+          let fullSrc = cv.imread(fullC);
+
+          // ★ 縮小前ぼかし（軽め）
+          cv.GaussianBlur(fullSrc, fullSrc, new cv.Size(5, 5), 0);
+
+          // ★ 900px に縮小
+          const maxSide = 900;
+          const scale = Math.min(
+            1,
+            maxSide / Math.max(originalImg.width, originalImg.height),
+          );
+
+          const newW = Math.round(originalImg.width * scale);
+          const newH = Math.round(originalImg.height * scale);
+
+          let resized = new cv.Mat();
+          cv.resize(
+            fullSrc,
+            resized,
+            new cv.Size(newW, newH),
+            0,
+            0,
+            cv.INTER_AREA,
+          );
+
+          // ★ tmpC に描画
+          const tmpC = document.createElement("canvas");
+          tmpC.width = newW;
+          tmpC.height = newH;
+          cv.imshow(tmpC, resized);
+
+          // ★ ここから先は今まで通り
+          let src = cv.imread(tmpC);
+
+          addLog(`画像: ${src.cols}×${src.rows}`);
+
+          if (gSrc) {
+            gSrc.delete();
+            gSrc = null;
+          }
+          boardRecognized = false;
+          uncertainMask = Array.from({ length: 9 }, () => Array(9).fill(false));
+          document.getElementById("inputGrid").innerHTML = "";
+          document.getElementById("rawWrap").style.display = "none";
+          document.getElementById("solveBtn").disabled = true;
+          document.getElementById("gridEditHint").style.display = "none";
+          gSrc = src;
+
+          const rawCanvas = document.getElementById("rawCanvas");
+          rawCanvas.width = rawCanvas.width;
+          rawCanvas.width = src.cols;
+          rawCanvas.height = src.rows;
+
+          //rawCanvas.style.width = src.cols + "px";
+          //rawCanvas.style.height = src.rows + "px";
+
+          const rawCtx = rawCanvas.getContext("2d"); //★追加
+          rawCtx.imageSmoothingEnabled = false; //★追加
+          cv.imshow(rawCanvas, src);
+
+          const rawWrap = document.getElementById("rawWrap");
+          rawWrap.style.display = "block";
+
+          void rawWrap.offsetWidth;
+
+          //await waitUntilLayoutReady(rawWrap);
+          //await waitCanvasPainted(rawCanvas);
+
+          await new Promise(requestAnimationFrame);
+          await new Promise(requestAnimationFrame);
+          await new Promise(requestAnimationFrame);
+          await new Promise(requestAnimationFrame);
+          await new Promise(requestAnimationFrame);
+
+          let gray = new cv.Mat();
+          let blur = new cv.Mat();
+          let thresh = new cv.Mat();
+
+          cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+          cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+          cv.adaptiveThreshold(
+            blur,
+            thresh,
+            255,
+            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv.THRESH_BINARY_INV,
+            11,
+            2,
+          );
+
+          let kernel = cv.getStructuringElement(
+            cv.MORPH_RECT,
+            new cv.Size(3, 3),
+          );
+          let morphed = new cv.Mat();
+          cv.morphologyEx(thresh, morphed, cv.MORPH_CLOSE, kernel);
+
+          let contours = new cv.MatVector();
+          let hier = new cv.Mat();
+          cv.findContours(
+            morphed,
+            contours,
+            hier,
+            cv.RETR_EXTERNAL,
+            cv.CHAIN_APPROX_SIMPLE,
+          );
+          addLog(`輪郭数: ${contours.size()}`);
+
+          let best = null;
+          let bestArea = 0;
+
+          for (let i = 0; i < contours.size(); i++) {
+            const cnt = contours.get(i);
+            const area = cv.contourArea(cnt);
+            if (area < 8000) {
+              cnt.delete();
+              continue;
+            }
+
+            const peri = cv.arcLength(cnt, true);
+            const approx = new cv.Mat();
+            cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+
+            if (approx.rows === 4 && area > bestArea) {
+              if (best) best.delete();
+              best = approx;
+              bestArea = area;
+            } else {
+              approx.delete();
+            }
+            cnt.delete();
+          }
+
+          let initialCorners;
+          if (best) {
+            initialCorners = orderCorners(best);
+            addLog(`盤面面積: ${Math.round(bestArea)}`);
+            addLog(
+              "自動検出結果を初期値として表示しました。必要なら四隅を微調整してください。",
+            );
+          } else {
+            addLog(
+              "自動検出できなかったため、画像全体を初期値にしました。四隅を手動で合わせてください。",
+            );
+            initialCorners = [
+              { x: 0, y: 0 },
+              { x: src.cols, y: 0 },
+              { x: src.cols, y: src.rows },
+              { x: 0, y: src.rows },
+            ];
+          }
+
+          // ★ iPhone の描画反映を待つ
+          await new Promise(requestAnimationFrame);
+
+          setHandlesFromCorners(initialCorners, src.cols, src.rows);
+
+          document.getElementById("warpWrap").style.display = "none";
+          document.getElementById("inputGrid").innerHTML = "";
+          document.getElementById("warnMsg").style.display = "none";
+          document.getElementById("detectErrMsg").style.display = "none";
+          document.getElementById("gridEditHint").style.display = "none";
+          document.getElementById("solveBtn").disabled = true;
+
+          boardRecognized = false;
+          detectedBoard = Array.from({ length: 9 }, () => Array(9).fill(0));
+          givenMask = Array.from({ length: 9 }, () => Array(9).fill(false));
+          uncertainMask = Array.from({ length: 9 }, () => Array(9).fill(false));
+
+          del(gray, blur, thresh, morphed, kernel, contours, hier, best);
+          showSection("secConfirm");
+        } catch (e) {
+          addLog("ERROR: " + e.message);
+          console.error(e);
+        }
+      }
+
+      function waitFrames(n) {
+        return new Promise((resolve) => {
+          function step() {
+            if (--n <= 0) resolve();
+            else requestAnimationFrame(step);
+          }
+          requestAnimationFrame(step);
+        });
+      }
+
+      async function finalizeBoard() {
+        if (!gSrc) {
+          throw new Error("元画像がありません");
+        }
+
+        const SIZE = 300;
+
+        const srcCanvas = document.getElementById("rawCanvas"); // 4隅ハンドルを置いているキャンバス
+        if (!srcCanvas) {
+          console.error("srcCanvas が見つかりません");
+          return;
+        }
+        const scaleX = gSrc.cols / srcCanvas.width;
+        const scaleY = gSrc.rows / srcCanvas.height;
+
+        const userCornersCanvas = getHandleCornersInCanvas();
+
+        const userCorners = userCornersCanvas.map((p) => ({
+          x: Math.round(p.x * scaleX),
+          y: Math.round(p.y * scaleY),
+        }));
+
+        // ★ refineAllCorners を呼ぶ
+        const refinedCorners = refineAllCorners(gSrc, userCorners);
+
+        // 画面上に refine 後の点を描く（マゼンタ）
+        // refinedCorners.forEach((p) => {
+        //   drawDebugPointOnRawCanvas(
+        //     { x: p.x / scaleX, y: p.y / scaleY },
+        //     "magenta",
+        //   );
+        // });
+
+        //debugDrawCornersOnRawCanvas(
+        //  userCornersCanvas.map((p, i) => ({
+        //    x: refinedCorners[i].x / scaleX,
+        //    y: refinedCorners[i].y / scaleY,
+        //  })),
+        //);
+
+        // ★ refinedCorners を warp に使う
+        const srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
+          refinedCorners[0].x,
+          refinedCorners[0].y,
+          refinedCorners[1].x,
+          refinedCorners[1].y,
+          refinedCorners[2].x,
+          refinedCorners[2].y,
+          refinedCorners[3].x,
+          refinedCorners[3].y,
+        ]);
+
+        const dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
+          0,
+          0,
+          SIZE - 1,
+          0,
+          SIZE - 1,
+          SIZE - 1,
+          0,
+          SIZE - 1,
+        ]);
+
+        const M = cv.getPerspectiveTransform(srcPts, dstPts);
+
+        let warped = new cv.Mat();
+        cv.warpPerspective(
+          gSrc,
+          warped,
+          M,
+          new cv.Size(SIZE, SIZE),
+          cv.INTER_NEAREST, // ★ 対策1：最近傍補間
+          cv.BORDER_CONSTANT,
+          new cv.Scalar(),
+        );
+
+        const warpCanvas = document.getElementById("warpedCanvas");
+        warpCanvas.width = warpCanvas.width;
+        warpCanvas.width = SIZE;
+        warpCanvas.height = SIZE;
+
+        const warpCtx = warpCanvas.getContext("2d");
+        warpCtx.imageSmoothingEnabled = false; // 補間を切る
+
+        cv.imshow(warpCanvas, warped);
+
+        document.getElementById("warpWrap").style.display = "block";
+        addLog("盤面を正規化しました");
+
+        const result = await extractDigits(warped, SIZE);
+        detectedBoard = result.board;
+        givenMask = result.givenMask;
+        uncertainMask = result.uncertainMask;
+
+        renderInputGrid();
+        document.getElementById("gridEditHint").style.display = "block";
+        document.getElementById("solveBtn").disabled = false;
+        boardRecognized = true;
+
+        del(srcPts, dstPts, M, warped);
+      }
+
+      function getHandleCornersInCanvas() {
+        const rawCanvas = document.getElementById("rawCanvas");
+        const handles = [
+          document.getElementById("h0"),
+          document.getElementById("h1"),
+          document.getElementById("h2"),
+          document.getElementById("h3"),
+        ];
+
+        return handles.map((h) => {
+          const lx = parseFloat(h.style.left);
+          const ty = parseFloat(h.style.top);
+          return {
+            x: (lx / 100) * rawCanvas.width,
+            y: (ty / 100) * rawCanvas.height,
+          };
+        });
+      }
+
+      function houghFallback(gray, W, H, addLog) {
+        let edges = new cv.Mat(),
+          lines = new cv.Mat();
+        cv.Canny(gray, edges, 50, 150);
+        cv.HoughLines(edges, lines, 1, Math.PI / 180, 120);
+        edges.delete();
+        if (!lines || lines.rows === 0) {
+          lines.delete();
+          return null;
+        }
+        let h = [],
+          v = [];
+        for (let i = 0; i < lines.rows; i++) {
+          const rho = lines.data32F[i * 2],
+            theta = lines.data32F[i * 2 + 1];
+          if (Math.abs(theta) < 0.3 || Math.abs(theta - Math.PI) < 0.3)
+            v.push(rho);
+          else if (Math.abs(theta - Math.PI / 2) < 0.3) h.push(rho);
+        }
+        lines.delete();
+        if (h.length < 2 || v.length < 2) return null;
+        h.sort((a, b) => a - b);
+        v.sort((a, b) => a - b);
+        const top = h[0],
+          bot = h[h.length - 1],
+          left = v[0],
+          right = v[v.length - 1];
+        addLog(`Hough: top=${Math.round(top)} bot=${Math.round(bot)}`);
+        return cv.matFromArray(4, 1, cv.CV_32FC2, [
+          left,
+          top,
+          right,
+          top,
+          right,
+          bot,
+          left,
+          bot,
+        ]);
+      }
+
+      function orderCorners(mat) {
+        let pts = [];
+        for (let i = 0; i < 4; i++)
+          pts.push({ x: mat.data32F[i * 2], y: mat.data32F[i * 2 + 1] });
+        pts.sort((a, b) => a.y - b.y);
+        const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+        const bot = pts.slice(2, 4).sort((a, b) => a.x - b.x);
+        return [top[0], top[1], bot[1], bot[0]];
+      }
+
+      // ═══════════════════════════════════════════════════
+      //  セル数字認識（輪郭方式の空白判定 + OTSU + 太字化）
+      // ═══════════════════════════════════════════════════
+      // セル数字認識（黒ピクセル方式の空白判定 + OTSU + 太字化）
+      async function extractDigits(warped, SIZE) {
+        const board = Array.from({ length: 9 }, () => Array(9).fill(0));
+        const given = Array.from({ length: 9 }, () => Array(9).fill(false));
+        const uncertain = Array.from({ length: 9 }, () => Array(9).fill(false));
+
+        // ① 盤面全体をグレースケール
+        let gray = new cv.Mat();
+        cv.cvtColor(warped, gray, cv.COLOR_RGBA2GRAY);
+
+        // ② 盤面全体を一度だけ2値化（ここで勝負する）
+        let binBoard = new cv.Mat();
+        // まずは OTSU 版で試す（ここを固定閾値に変えるのもアリ）
+        cv.threshold(
+          gray,
+          binBoard,
+          0,
+          255,
+          cv.THRESH_BINARY_INV | cv.THRESH_OTSU,
+        );
+
+        const worker = await ensureOcrWorker();
+
+        const tmpCanvas = document.createElement("canvas");
+        const cellCanvas = document.createElement("canvas");
+        cellCanvas.width = 64;
+        cellCanvas.height = 64;
+        const cellCtx = cellCanvas.getContext("2d");
+
+        const cellSize = SIZE / 9;
+        const margin = Math.floor(cellSize * 0.12); // ここは今のまま 0.12 で
+
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            const sx = Math.max(0, Math.floor(c * cellSize + margin));
+            const sy = Math.max(0, Math.floor(r * cellSize + margin));
+            const sw = Math.floor(cellSize - margin * 2);
+            const sh = Math.floor(cellSize - margin * 2);
+
+            if (sw < 8 || sh < 8) {
+              board[r][c] = 0;
+              continue;
+            }
+
+            // ③ セルは binBoard から切り出す（セルごとに2値化しない）
+            const roi = new cv.Rect(sx, sy, sw, sh);
+            let bin = binBoard.roi(roi);
+
+            // ④ 中心40%だけで空白判定
+            const cx = Math.floor(bin.cols * 0.3);
+            const cy = Math.floor(bin.rows * 0.3);
+            const cw = Math.floor(bin.cols * 0.4);
+            const ch = Math.floor(bin.rows * 0.4);
+
+            let center = bin.roi(new cv.Rect(cx, cy, cw, ch));
+            let whiteCenter = cv.countNonZero(center);
+            let totalCenter = cw * ch;
+
+            if (whiteCenter < totalCenter * 0.02) {
+              board[r][c] = 0;
+              center.delete();
+              bin.delete();
+              continue;
+            }
+            center.delete();
+
+            // ⑤ 必要ならここで dilation（セル単位で）
+            // let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
+            // cv.dilate(bin, bin, kernel);
+
+            // ⑥ OCR 用に 64×64 に拡大
+            let resized = new cv.Mat();
+            cv.resize(bin, resized, new cv.Size(64, 64), 0, 0, cv.INTER_LINEAR);
+
+            tmpCanvas.width = 64;
+            tmpCanvas.height = 64;
+            cv.imshow(tmpCanvas, resized);
+            cellCtx.drawImage(tmpCanvas, 0, 0, 64, 64);
+
+            const { data } = await worker.recognize(cellCanvas);
+            const txt = (data.text || "").replace(/\D/g, "");
+            const digit = txt ? Number(txt[0]) : null;
+
+            if (digit >= 1 && digit <= 9 && data.confidence >= 30) {
+              board[r][c] = digit;
+              given[r][c] = true;
+            } else {
+              board[r][c] = 0;
+              uncertain[r][c] = true;
+            }
+
+            bin.delete();
+            resized.delete();
+          }
+        }
+
+        gray.delete();
+        binBoard.delete();
+
+        return {
+          board,
+          givenMask: given,
+          uncertainMask: uncertain,
+        };
+      }
+
+      function classifyDigit(pix, W, x0, y0, x1, y1) {
+        // 各列の白ピクセル数（垂直投影）
+        const cw = x1 - x0,
+          ch = y1 - y0;
+        const cols = Array(cw).fill(0);
+        const rows = Array(ch).fill(0);
+        for (let py = y0; py < y1; py++)
+          for (let px = x0; px < x1; px++) {
+            if (pix[(py * W + px) * 4] > 128) {
+              cols[px - x0]++;
+              rows[py - y0]++;
+            }
+          }
+        const totalW = cols.reduce((a, b) => a + b, 0);
+        const leftW = cols
+          .slice(0, Math.floor(cw / 3))
+          .reduce((a, b) => a + b, 0);
+        const rightW = cols
+          .slice(Math.ceil((cw * 2) / 3))
+          .reduce((a, b) => a + b, 0);
+        const midW = cols
+          .slice(Math.floor(cw / 3), Math.ceil((cw * 2) / 3))
+          .reduce((a, b) => a + b, 0);
+        const topH = rows
+          .slice(0, Math.floor(ch / 3))
+          .reduce((a, b) => a + b, 0);
+        const botH = rows
+          .slice(Math.ceil((ch * 2) / 3))
+          .reduce((a, b) => a + b, 0);
+        const midH = rows
+          .slice(Math.floor(ch / 3), Math.ceil((ch * 2) / 3))
+          .reduce((a, b) => a + b, 0);
+
+        if (totalW === 0) return 0;
+        const lr = leftW / (rightW + 1);
+        const tb = topH / (botH + 1);
+        const midRatio = midW / (totalW + 1);
+        const centerRatio = midH / (totalW + 1);
+
+        // 1: 中央縦線のみ
+        if (
+          midW > leftW * 1.5 &&
+          midW > rightW * 1.5 &&
+          totalW < cw * ch * 0.15
+        )
+          return 1;
+        // 7: 上横線強く、下は細い
+        if (topH > botH * 1.8 && rightW > leftW * 1.2) return 7;
+        // 簡易識別：数字があることは分かるが詳細は手動修正を促す
+        // （実用にはTesseract.jsを組み込んでください）
+        return null; // null=要手動入力
+      }
+
+      // ═══════════════════════════════════════════════════
+      //  入力グリッド
+      // ═══════════════════════════════════════════════════
+      function renderInputGrid() {
+        const grid = document.getElementById("inputGrid");
+        grid.innerHTML = "";
+
+        let unrecognized = 0;
+
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            const cell = document.createElement("div");
+            cell.className = "sudoku-cell";
+            cell.dataset.r = r;
+            cell.dataset.c = c;
+
+            const val = detectedBoard[r][c];
+
+            if (Number.isInteger(val) && val >= 1 && val <= 9) {
+              cell.textContent = val;
+              cell.classList.add("given");
+            } else if (uncertainMask[r][c]) {
+              cell.textContent = "?";
+              cell.style.color = "#e94560";
+              unrecognized++;
+            } else {
+              cell.textContent = "";
+              cell.classList.add("empty");
+            }
+
+            cell.addEventListener("click", () => openPicker(r, c, cell));
+            grid.appendChild(cell);
+          }
+        }
+
+        const w = document.getElementById("warnMsg");
+        if (unrecognized > 0) {
+          w.textContent = `⚠ ${unrecognized}マスは数字らしきものがありますが読めませんでした。「?」をタップして修正してください。`;
+          w.style.display = "block";
+        } else {
+          w.style.display = "none";
+        }
+      }
+
+      // ═══════════════════════════════════════════════════
+      //  数字ピッカー
+      // ═══════════════════════════════════════════════════
+      function openPicker(r, c, cellEl) {
+        pickerTarget = { r, c, el: cellEl };
+        document.getElementById("pickerTitle").textContent =
+          `${c + 1}列・${r + 1}行 の数字を選択`;
+
+        const pg = document.getElementById("pickerGrid");
+        pg.innerHTML = "";
+        for (let n = 1; n <= 9; n++) {
+          const btn = document.createElement("button");
+          btn.className = "pk";
+          btn.textContent = n;
+          btn.addEventListener("click", () => pickNumber(n));
+          pg.appendChild(btn);
+        }
+        const del = document.createElement("button");
+        del.className = "pk del";
+        del.textContent = "消去";
+        del.addEventListener("click", () => pickNumber(0));
+        pg.appendChild(del);
+
+        document.getElementById("picker").classList.add("open");
+        document.getElementById("pickerOverlay").classList.add("open");
+      }
+
+      function pickNumber(n) {
+        const { r, c } = pickerTarget;
+        detectedBoard[r][c] = n;
+        givenMask[r][c] = n !== 0;
+        uncertainMask[r][c] = false;
+        renderInputGrid();
+        closePicker();
+      }
+
+      function closePicker() {
+        document.getElementById("picker").classList.remove("open");
+        document.getElementById("pickerOverlay").classList.remove("open");
+        pickerTarget = null;
+      }
+      document
+        .getElementById("pickerOverlay")
+        .addEventListener("click", closePicker);
+
+      // ═══════════════════════════════════════════════════
+      //  Pyodide で解答（finalizeBoard → OCR → ソルバ）
+      // ═══════════════════════════════════════════════════
+      document
+        .getElementById("solveBtn")
+        .addEventListener("click", async () => {
+          const btn = document.getElementById("solveBtn");
+          btn.disabled = true;
+          btn.textContent = "解答中…";
+
+          try {
+            // ★ まず finalizeBoard() を実行して OCR → inputGrid を作る
+            if (!boardRecognized) {
+              await finalizeBoard();
+            }
+
+            // ★ OCR 結果（detectedBoard）を Python に渡す
+            pyodide.globals.set("_board_input", pyodide.toPy(detectedBoard));
+
+            const result = await pyodide.runPythonAsync(`
+            import json
+            _result = solve_board(_board_input)
+            json.dumps(_result)
+            `);
+
+            const data = JSON.parse(result);
+            console.log("solver result:", data);
+
+            if (data.logs) {
+              document.getElementById("solveErrMsg").textContent =
+                data.logs.join("\n");
+              document.getElementById("solveErrMsg").style.display = "block";
+            }
+
+            if (data.logs) {
+              ok.textContent = data.logs.join("\n");
+              ok.style.whiteSpace = "pre-wrap"; // 改行を反映
+              ok.style.display = "block";
+              return;
+            }
+
+            // ★ ソルバ結果を表示する画面へ
+            showSection("secResult");
+
+            const ok = document.getElementById("solveOkMsg");
+            const warn = document.getElementById("solveWarnMsg");
+            const err = document.getElementById("solveErrMsg");
+
+            ok.style.display = "none";
+            warn.style.display = "none";
+            err.style.display = "none";
+
+            if (data.status === "invalid") {
+              err.textContent = data.message;
+              err.style.display = "block";
+              return;
+            }
+
+            if (data.status === "solved") {
+              ok.textContent = "✅ 解答完了！赤字が今回埋めた数字です。";
+              ok.style.display = "block";
+            } else {
+              warn.textContent =
+                "⚠ 一部未解決のマスがあります。認識ミスがある可能性があります。";
+              warn.style.display = "block";
+            }
+
+            renderResultGrid(data.board);
+          } catch (e) {
+            document.getElementById("solveErrMsg").textContent =
+              "エラー: " + e.message;
+            document.getElementById("solveErrMsg").style.display = "block";
+            showSection("secResult");
+            console.error(e);
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "解答する";
+          }
+        });
+
+      // ═══════════════════════════════════════════════════
+      //  解答グリッド
+      // ═══════════════════════════════════════════════════
+      function renderResultGrid(board) {
+        const grid = document.getElementById("resultGrid");
+        grid.innerHTML = "";
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            const cell = document.createElement("div");
+            cell.className = "sudoku-cell";
+            cell.dataset.r = r;
+            cell.dataset.c = c;
+            const val = board[r][c];
+            cell.textContent = val || "";
+            if (givenMask[r][c]) cell.classList.add("given");
+            else if (val) cell.classList.add("solved");
+            else cell.classList.add("empty");
+            grid.appendChild(cell);
+          }
+        }
+      }
+
+      // ═══════════════════════════════════════════════════
+      //  UI ナビゲーション
+      // ═══════════════════════════════════════════════════
+      function showSection(id) {
+        ["secCapture", "secConfirm", "secResult"].forEach((s) => {
+          document.getElementById(s).classList.toggle("active", s === id);
+        });
+      }
+
+      document.getElementById("retryBtn").addEventListener("click", () => {
+        showSection("secCapture");
+        document.getElementById("fileInput").value = "";
+        document.getElementById("previewImg").src = "";
+        document.getElementById("previewWrap").style.display = "none";
+        document.getElementById("detectBtn").disabled = true;
+        document.getElementById("log").textContent = "";
+        document.getElementById("warpWrap").style.display = "none";
+        document.getElementById("warnMsg").style.display = "none";
+        document.getElementById("detectErrMsg").style.display = "none";
+        detectedBoard = Array.from({ length: 9 }, () => Array(9).fill(0));
+        givenMask = Array.from({ length: 9 }, () => Array(9).fill(false));
+        originalImg = null;
+      });
+
+      document
+        .getElementById("recognizeBtn")
+        .addEventListener("click", async () => {
+          const btn = document.getElementById("recognizeBtn");
+          btn.disabled = true;
+          btn.textContent = "文字認識中…";
+
+          try {
+            await finalizeBoard();
+          } catch (e) {
+            const msg = e && e.message ? e.message : String(e);
+            const el = document.getElementById("detectErrMsg");
+            el.textContent = "OCRエラー: " + msg;
+            el.style.display = "block";
+            console.error("OCR ERROR:", e);
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "四隅を確定して文字認識";
+          }
+        });
+
+      document
+        .getElementById("restartBtn")
+        .addEventListener("click", () => location.reload());
+
+      function del(...mats) {
+        mats.forEach((m) => {
+          try {
+            m.delete();
+          } catch (e) {}
+        });
+      }
+
+      let dragging = null;
+
+      function onPointerDown(e) {
+        dragging = e.target;
+      }
+
+      function onPointerMove(e) {
+        if (!dragging) return;
+
+        const wrap = document.getElementById("rawWrap");
+        const rect = wrap.getBoundingClientRect();
+
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const xp = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        const yp = Math.max(0, Math.min(100, (y / rect.height) * 100));
+
+        dragging.style.left = xp + "%";
+        dragging.style.top = yp + "%";
+
+        updateQuadOverlay();
+      }
+
+      function onPointerUp() {
+        dragging = null;
+      }
+
+      document.querySelectorAll(".corner-handle").forEach((h) => {
+        h.addEventListener("pointerdown", onPointerDown);
+      });
+
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+    </script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js");
+      }
+    </script>
+  </body>
+</html>
