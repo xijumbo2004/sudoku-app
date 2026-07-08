@@ -608,11 +608,6 @@
     </div>
 
     <!-- ライブラリ読み込み -->
-    <script
-      async
-      src="https://docs.opencv.org/4.x/opencv.js"
-      onload="onCvReady()"
-    ></script>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
@@ -2471,5 +2466,10 @@ def solve_board(raw_board):
         navigator.serviceWorker.register("service-worker.js");
       }
     </script>
+    <script
+      async
+      src="https://docs.opencv.org/4.x/opencv.js"
+      onload="onCvReady()"
+    ></script>
   </body>
 </html>
